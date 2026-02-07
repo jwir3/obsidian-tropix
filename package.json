@@ -1,0 +1,46 @@
+{
+  "name": "tropix",
+  "version": "1.0.0",
+  "description": "TropiX: A tropical-themed Obsidian plugin for Source-Topic-Argument cross-referencing and notetaking.",
+  "main": "dist/main.js",
+  "scripts": {
+    "dev": "node scripts/build.mjs --dev",
+    "build": "node scripts/build.mjs",
+    "build:check": "tsc -noEmit -skipLibCheck",
+    "clean": "node scripts/build.mjs --clean",
+    "package": "node scripts/build.mjs --clean --package",
+    "build:watch": "node esbuild.config.mjs",
+    "build:prod": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
+    "version": "node scripts/version-bump.mjs && git add manifest.json versions.json",
+    "help": "node scripts/build.mjs --help",
+    "install:plugin": "yarn build && mkdir -p ~/.obsidian/plugins/obsidian-tropix && cp dist/* ~/.obsidian/plugins/obsidian-tropix/",
+    "lint": "eslint src/ scripts/ --ext .ts,.mjs",
+    "lint:fix": "eslint src/ scripts/ --ext .ts,.mjs --fix",
+    "typecheck": "tsc --noEmit",
+    "clean:all": "yarn clean && rimraf node_modules yarn.lock && yarn install"
+  },
+  "keywords": [
+    "obsidian",
+    "plugin",
+    "notetaking",
+    "source-topic-argument",
+    "sta",
+    "tropix",
+    "tropical",
+    "cross-referencing"
+  ],
+  "author": "Scott Johnson",
+  "license": "MPL-2.0",
+  "devDependencies": {
+    "@types/node": "^16.11.6",
+    "@typescript-eslint/eslint-plugin": "5.29.0",
+    "@typescript-eslint/parser": "5.29.0",
+    "builtin-modules": "3.3.0",
+    "esbuild": "0.17.3",
+    "obsidian": "latest",
+    "tslib": "2.4.0",
+    "typescript": "4.7.4",
+    "rimraf": "^3.0.2"
+  },
+  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
+}

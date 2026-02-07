@@ -1,0 +1,11 @@
+{
+  "id": "obsidian-tropix",
+  "name": "TropiX",
+  "version": "1.0.0",
+  "minAppVersion": "0.15.0",
+  "description": "TropiX: A tropical-themed Obsidian plugin for Source-Topic-Argument cross-referencing and notetaking.",
+  "author": "Scott Johnson",
+  "authorUrl": "https://github.com/jwir3/obsidian-tropix",
+  "fundingUrl": "https://buymeacoffee.com/jaywir3w",
+  "isDesktopOnly": false
+}

@@ -1,0 +1,738 @@
+/* STA Plugin Styles */
+
+.sta-button-container {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+    flex-wrap: wrap;
+}
+
+.sta-button-container button {
+    flex: 1;
+    min-width: 120px;
+    padding: 8px 16px;
+    border-radius: 4px;
+    border: 1px solid var(--background-modifier-border);
+    background-color: var(--interactive-normal);
+    color: var(--text-normal);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.sta-button-container button:hover {
+    background-color: var(--interactive-hover);
+    border-color: var(--interactive-accent);
+}
+
+.sta-button-container button.mod-cta {
+    background-color: var(--interactive-accent);
+    color: var(--text-on-accent);
+    border-color: var(--interactive-accent);
+}
+
+.sta-button-container button.mod-cta:hover {
+    background-color: var(--interactive-accent-hover);
+}
+
+.sta-form {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    margin-top: 20px;
+}
+
+.sta-form label {
+    font-weight: 500;
+    color: var(--text-normal);
+    margin-bottom: 5px;
+}
+
+.sta-form input[type="text"] {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 4px;
+    background-color: var(--background-primary);
+    color: var(--text-normal);
+    font-size: 14px;
+}
+
+.sta-form input[type="text"]:focus {
+    outline: none;
+    border-color: var(--interactive-accent);
+    box-shadow: 0 0 0 2px var(--interactive-accent-alpha);
+}
+
+.sta-results {
+    max-height: 300px;
+    overflow-y: auto;
+    margin-top: 15px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 4px;
+}
+
+.sta-result-item {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--background-modifier-border);
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.sta-result-item:last-child {
+    border-bottom: none;
+}
+
+.sta-result-item:hover {
+    background-color: var(--background-modifier-hover);
+}
+
+.sta-result-item strong {
+    color: var(--text-normal);
+    font-weight: 600;
+}
+
+.sta-type-label {
+    color: var(--text-muted);
+    font-size: 12px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    background-color: var(--background-modifier-border);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.sta-type-label[data-type="source"] {
+    background-color: rgba(75, 130, 232, 0.6);
+    color: var(--text-normal);
+}
+
+.sta-type-label[data-type="topic"] {
+    background-color: rgba(38, 160, 105, 0.6);
+    color: var(--text-normal);
+}
+
+.sta-type-label[data-type="argument"] {
+    background-color: rgba(219, 112, 147, 0.6);
+    color: var(--text-normal);
+}
+
+.sta-no-results {
+    padding: 20px;
+    text-align: center;
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+/* Modal specific styles */
+.modal-content .sta-button-container {
+    justify-content: center;
+    align-items: center;
+}
+
+.modal-content .sta-form input[type="text"] {
+    font-family: var(--font-interface);
+}
+
+/* Ribbon icon styling */
+.workspace-ribbon-collapse-btn + .side-dock-ribbon-action[aria-label*="STA"] {
+    color: var(--interactive-accent);
+}
+
+/* Settings tab specific styles */
+.setting-item-description {
+    margin-bottom: 10px;
+}
+
+.setting-item textarea {
+    font-family: var(--font-monospace);
+    resize: vertical;
+    min-height: 100px;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .sta-button-container {
+        flex-direction: column;
+    }
+
+    .sta-button-container button {
+        min-width: unset;
+    }
+
+    .sta-results {
+        max-height: 250px;
+    }
+}
+
+/* Dark theme adjustments */
+.theme-dark .sta-form input[type="text"] {
+    background-color: var(--background-primary-alt);
+}
+
+.theme-dark .sta-result-item {
+    border-color: var(--background-modifier-border-hover);
+}
+
+/* Animation for smooth interactions */
+.sta-result-item,
+.sta-button-container button {
+    transition: all 0.15s ease-in-out;
+}
+
+/* Focus styles for accessibility */
+.sta-form input[type="text"]:focus,
+.sta-result-item:focus,
+.sta-button-container button:focus {
+    outline: 2px solid var(--interactive-accent);
+    outline-offset: 2px;
+}
+
+/* Custom scrollbar for results */
+.sta-results::-webkit-scrollbar {
+    width: 8px;
+}
+
+.sta-results::-webkit-scrollbar-track {
+    background: var(--background-secondary);
+    border-radius: 4px;
+}
+
+.sta-results::-webkit-scrollbar-thumb {
+    background: var(--background-modifier-border-hover);
+    border-radius: 4px;
+}
+
+.sta-results::-webkit-scrollbar-thumb:hover {
+    background: var(--text-muted);
+}
+
+/* File Explorer STA Labels - matching Obsidian's native file type labels */
+.sta-file-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    margin-left: 8px;
+    padding: 2px 6px;
+    font-size: 10px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-radius: 10px;
+    vertical-align: middle;
+    line-height: 1;
+    opacity: 0.7;
+    transition: opacity 0.15s ease;
+    font-family: var(--font-ui-smaller);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    position: relative;
+    flex-shrink: 0;
+}
+
+/* Position labels similar to file extension labels */
+.nav-file-title-content {
+    display: flex;
+    align-items: center;
+    flex: 1;
+    min-width: 0;
+}
+
+.nav-file-title-content .sta-file-label {
+    margin-left: auto;
+    margin-right: 4px;
+    flex-shrink: 0;
+}
+
+.sta-file-label:hover {
+    opacity: 0.9;
+}
+
+/* Color scheme with semi-transparent backgrounds for better emoji visibility */
+.sta-label-source {
+    background-color: rgba(75, 130, 232, 0.6);
+    color: var(--text-normal);
+}
+
+.sta-label-topic {
+    background-color: rgba(38, 160, 105, 0.6);
+    color: var(--text-normal);
+}
+
+.sta-label-argument {
+    background-color: rgba(219, 112, 147, 0.6);
+    color: var(--text-normal);
+}
+
+/* Light theme specific colors with transparency */
+.theme-light .sta-label-source {
+    background-color: rgba(79, 130, 232, 0.5);
+    color: var(--text-normal);
+}
+
+.theme-light .sta-label-topic {
+    background-color: rgba(38, 160, 105, 0.5);
+    color: var(--text-normal);
+}
+
+.theme-light .sta-label-argument {
+    background-color: rgba(219, 112, 147, 0.5);
+    color: var(--text-normal);
+}
+
+/* Dark theme specific colors with transparency */
+.theme-dark .sta-label-source {
+    background-color: rgba(107, 167, 245, 0.4);
+    color: var(--text-normal);
+}
+
+.theme-dark .sta-label-topic {
+    background-color: rgba(82, 209, 155, 0.4);
+    color: var(--text-normal);
+}
+
+.theme-dark .sta-label-argument {
+    background-color: rgba(255, 20, 147, 0.4);
+    color: var(--text-normal);
+}
+
+/* Integration with file explorer structure */
+.nav-file-title {
+    display: flex;
+    align-items: center;
+}
+
+/* Ensure proper spacing and alignment */
+.nav-file:hover .sta-file-label,
+.nav-file.is-active .sta-file-label {
+    opacity: 1;
+}
+
+/* Responsive behavior for narrow sidebars */
+@media (max-width: 400px) {
+    .sta-file-label {
+        font-size: 9px;
+        padding: 1px 4px;
+        margin-left: 4px;
+    }
+}
+
+/* Emoji icon styling within labels */
+.sta-label-icon {
+    display: inline-flex;
+    align-items: center;
+    line-height: 1;
+    font-size: 12px;
+    margin-right: 3px;
+}
+
+.sta-label-text {
+    line-height: 1;
+}
+
+/* Ensure emoji icons are properly sized and aligned */
+.sta-file-label .sta-label-icon {
+    font-size: 11px;
+}
+
+.sta-type-label .sta-label-icon {
+    font-size: 12px;
+}
+
+/* Tag-based identification styles */
+.sta-tags-display {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 4px;
+    font-style: italic;
+}
+
+.sta-type-label[data-type="unknown"] {
+    background-color: var(--text-muted);
+    color: white;
+}
+
+/* Settings page styles for tag configuration */
+.setting-item textarea[rows="2"] {
+    min-height: 60px;
+    font-family: var(--font-interface);
+}
+
+/* Tag configuration help text */
+.sta-tag-help {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 5px;
+    font-style: italic;
+}
+
+/* Enhanced result items for tag display */
+.sta-result-item {
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+.sta-result-item > div:first-child {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    margin-bottom: 2px;
+}
+
+.sta-result-item .sta-tags-display {
+    padding-left: 8px;
+    border-left: 2px solid var(--background-modifier-border);
+}
+
+/* Improved tag label styling */
+.sta-type-label {
+    margin-left: 8px;
+    font-size: 11px;
+}
+
+/* Tag identification indicator */
+.sta-identification-method {
+    font-size: 10px;
+    color: var(--text-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-left: auto;
+    padding: 1px 4px;
+    border-radius: 2px;
+    background-color: var(--background-modifier-border);
+}
+
+/* Settings section styling */
+.setting-item-description {
+    margin-bottom: 8px;
+}
+
+/* Enhanced button styling for settings */
+.setting-item-control button {
+    margin-left: 8px;
+}
+
+/* Settings section transitions and disabled states */
+.setting-item {
+    transition:
+        opacity 0.3s ease,
+        transform 0.3s ease;
+}
+
+.setting-item.disabled {
+    opacity: 0.4;
+    pointer-events: none;
+    transform: translateX(10px);
+}
+
+.setting-item.hidden {
+    display: none !important;
+}
+
+/* Smooth transitions for settings visibility */
+.setting-item:not(.hidden) {
+    animation: fadeInSlide 0.3s ease forwards;
+}
+
+@keyframes fadeInSlide {
+    from {
+        opacity: 0;
+        transform: translateX(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* Disabled setting styling */
+.setting-item.disabled .setting-item-name {
+    color: var(--text-muted);
+}
+
+.setting-item.disabled .setting-item-description {
+    color: var(--text-faint);
+}
+
+.setting-item.disabled input,
+.setting-item.disabled textarea,
+.setting-item.disabled select {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Section headers for disabled sections */
+.settings-section-header.disabled {
+    opacity: 0.6;
+    color: var(--text-muted);
+}
+
+/* Styling for folder creation modal */
+.sta-form input[type="text"]:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.sta-form .folder-hint {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 4px;
+    font-style: italic;
+}
+
+.sta-form .folder-hint.disabled {
+    color: var(--text-faint);
+}
+
+/* Context menu styling for STA options */
+.menu-item[data-sta="true"] {
+    border-left: 3px solid var(--interactive-accent);
+}
+
+/* Enhanced form styling for metadata fields */
+.sta-form label {
+    margin-top: 12px;
+    font-weight: 500;
+    color: var(--text-normal);
+    display: block;
+}
+
+.sta-form label:first-child {
+    margin-top: 0;
+}
+
+.sta-form textarea {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 4px;
+    background-color: var(--background-primary);
+    color: var(--text-normal);
+    font-size: 14px;
+    font-family: var(--font-interface);
+    resize: vertical;
+    min-height: 60px;
+}
+
+.sta-form textarea:focus {
+    outline: none;
+    border-color: var(--interactive-accent);
+    box-shadow: 0 0 0 2px var(--interactive-accent-alpha);
+}
+
+/* Metadata field grouping */
+.sta-metadata-section {
+    padding: 12px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 6px;
+    background-color: var(--background-secondary);
+    margin: 15px 0;
+}
+
+.sta-metadata-section h4 {
+    margin: 0 0 10px 0;
+    color: var(--text-normal);
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Form field spacing improvements */
+.sta-form input[type="text"],
+.sta-form textarea {
+    margin-bottom: 8px;
+}
+
+/* Rating field specific styling */
+.sta-form input[placeholder*="4/5"] {
+    width: 80px;
+}
+
+/* DOI field styling */
+.sta-form input[placeholder*="10.1000"] {
+    font-family: var(--font-monospace);
+    font-size: 13px;
+}
+
+/* PDF Link field styling */
+.sta-form input[placeholder*="https://"]
+{
+    font-family: var(--font-monospace);
+    font-size: 13px;
+    color: var(--text-accent);
+}
+
+/* Author field styling */
+.sta-form input[placeholder*="Author"] {
+    font-weight: 500;
+}
+
+/* DOI lookup container styling */
+.sta-doi-container {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.sta-doi-container input {
+    flex: 1;
+}
+
+.sta-lookup-btn {
+    padding: 6px 12px;
+    font-size: 12px;
+    background-color: var(--interactive-accent);
+    color: var(--text-on-accent);
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    white-space: nowrap;
+}
+
+.sta-lookup-btn:hover {
+    background-color: var(--interactive-accent-hover);
+}
+
+.sta-lookup-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Form field grouping for source metadata */
+.sta-form label:contains("Author"),
+.sta-form label:contains("DOI"),
+.sta-form label:contains("Summary"),
+.sta-form label:contains("Year"),
+.sta-form label:contains("Journal"),
+.sta-form label:contains("PDF Link") {
+    margin-top: 15px;
+}
+
+.sta-form label:contains("Author") {
+    margin-top: 8px;
+}
+
+/* Star rating component styling */
+.sta-star-rating {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin: 8px 0;
+}
+
+.sta-star {
+    font-size: 20px;
+    cursor: pointer;
+    color: var(--text-muted);
+    transition:
+        color 0.2s ease,
+        transform 0.1s ease;
+    user-select: none;
+}
+
+.sta-star:hover {
+    color: var(--color-yellow);
+    transform: scale(1.1);
+}
+
+.sta-star-filled {
+    color: var(--color-yellow) !important;
+}
+
+.sta-unrated {
+    margin-left: 12px;
+    font-size: 12px;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 3px;
+    transition: background-color 0.2s ease;
+}
+
+.sta-unrated:hover {
+    background-color: var(--background-modifier-hover);
+    color: var(--text-normal);
+}
+
+/* Light theme star colors */
+.theme-light .sta-star:hover,
+.theme-light .sta-star-filled {
+    color: #fbbf24 !important;
+}
+
+/* Dark theme star colors */
+.theme-dark .sta-star:hover,
+.theme-dark .sta-star-filled {
+    color: #facc15 !important;
+}
+
+/* Template selection modal styling */
+.sta-template-description {
+    color: var(--text-muted);
+    font-size: 14px;
+    margin: 15px 0 20px 0;
+    line-height: 1.4;
+}
+
+.sta-template-btn {
+    min-width: 140px;
+    padding: 10px 16px;
+    margin: 4px;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.sta-template-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* Template button specific colors */
+.sta-template-btn:contains("🌊") {
+    background-color: rgba(75, 130, 232, 0.1);
+    border-color: var(--color-blue);
+}
+
+.sta-template-btn:contains("🌿") {
+    background-color: rgba(38, 160, 105, 0.1);
+    border-color: var(--color-green);
+}
+
+.sta-template-btn:contains("🌺") {
+    background-color: rgba(219, 112, 147, 0.1);
+    border-color: var(--text-accent);
+}
+
+/* Modal button container improvements */
+.modal-content .sta-button-container {
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    margin-top: 25px;
+}
+
+.modal-content .sta-button-container button {
+    flex: none;
+    min-width: 100px;
+}
+
+/* Specific styling for source creation modal buttons */
+.modal-content .sta-button-container button.mod-cta {
+    background-color: var(--interactive-accent);
+    color: var(--text-on-accent);
+    border-color: var(--interactive-accent);
+}
+
+.modal-content .sta-button-container button:not(.mod-cta) {
+    background-color: var(--background-secondary);
+    color: var(--text-normal);
+    border-color: var(--background-modifier-border);
+}

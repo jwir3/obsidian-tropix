@@ -419,7 +419,7 @@ export default class STAPlugin extends Plugin {
 		// Apply source-specific metadata if provided
 		if (type === 'source' && metadata) {
 			const bibtexContent = metadata.bibtex ?
-				`$1\n>\`\`\`bibtex\n>${metadata.bibtex.split('\n').join('\n>')}\n>\`\`\`` :
+				`$1\n>\`\`\`bibtex\n>${this.formatBibTeX(metadata.bibtex).split('\n').join('\n>')}\n>\`\`\`` :
 				`$1\n>\`\`\`bibtex\n><!-- BibTeX citation will be added when available -->\n>\`\`\``;
 
 			content = content
@@ -507,6 +507,67 @@ export default class STAPlugin extends Plugin {
 		return staFiles;
 	}
 
+	formatBibTeX(bibtex: string): string {
+		if (!bibtex || !bibtex.trim()) {
+			return '<!-- BibTeX citation will be added when available -->';
+		}
+
+		// Parse BibTeX to extract citation key and convert to PascalCase
+		const entryMatch = bibtex.match(/@(\w+)\{([^,]+),/);
+		if (!entryMatch) {
+			return bibtex; // Return as-is if can't parse
+		}
+
+		const [, entryType, originalKey] = entryMatch;
+
+		// Convert citation key to PascalCase
+		const pascalCaseKey = this.toCamelCase(originalKey);
+
+		// Replace the citation key in the BibTeX
+		let workingBibTeX = bibtex.replace(
+			new RegExp(`@${entryType}\\{${originalKey.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')},`),
+			`@${entryType}{${pascalCaseKey},`
+		);
+
+		// If it's a single line, convert to multi-line format first
+		if (!workingBibTeX.includes('\n')) {
+			// Split on commas that are followed by a space and field name
+			workingBibTeX = workingBibTeX
+				.replace(/,\s*([a-zA-Z_]+\s*=)/g, ',\n    $1')
+				.replace(/\{([^,]+),/, '{\n$1,\n')
+				.replace(/\s*\}$/, '\n}');
+		}
+
+		// Format with proper indentation
+		const lines = workingBibTeX.split('\n');
+		const formatted = lines.map((line, index) => {
+			const trimmed = line.trim();
+			if (index === 0) {
+				// First line (entry type and key)
+				return trimmed;
+			} else if (trimmed === '}') {
+				// Closing brace
+				return '}';
+			} else if (trimmed) {
+				// Field lines - add proper indentation
+				return `    ${trimmed}`;
+			}
+			return '';
+		}).filter(line => line !== '').join('\n');
+
+		return formatted;
+	}
+
+	toCamelCase(str: string): string {
+		return str
+			.replace(/[-_\s]+/g, ' ') // Replace hyphens, underscores, spaces with spaces
+			.split(' ')
+			.map((word, index) => {
+				return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+			})
+			.join('');
+	}
+
 	async identifyNoteType(file: TFile): Promise<STANoteType | null> {
 		const content = await this.app.vault.read(file);
 
@@ -587,25 +648,26 @@ export default class STAPlugin extends Plugin {
 		const normalizeConfigTag = (tag: string) =>
 			tag.replace(/^#/, '').replace(/['"]/g, '').toLowerCase();
 
-		// Check for argument tags first (most specific)
+		// Check for most specific tags first
+		// Topic tags (most specific)
+		if (this.settings.topicTags.some(tag =>
+			normalizedNoteTags.includes(normalizeConfigTag(tag))
+		)) {
+			return 'topic';
+		}
+
+		// Argument tags (specific)
 		if (this.settings.argumentTags.some(tag =>
 			normalizedNoteTags.includes(normalizeConfigTag(tag))
 		)) {
 			return 'argument';
 		}
 
-		// Check for source tags
+		// Source tags (least specific - 'research' can apply to any note)
 		if (this.settings.sourceTags.some(tag =>
 			normalizedNoteTags.includes(normalizeConfigTag(tag))
 		)) {
 			return 'source';
-		}
-
-		// Check for topic tags
-		if (this.settings.topicTags.some(tag =>
-			normalizedNoteTags.includes(normalizeConfigTag(tag))
-		)) {
-			return 'topic';
 		}
 
 		return null;
@@ -1264,13 +1326,15 @@ class STANoteCreationModal extends Modal {
 					bibtex = (this as any).fetchedBibTeX;
 				} else {
 					try {
-						bibtex = await this.fetchBibTeXFromDOI(doi);
+						const rawBibTeX = await this.fetchBibTeXFromDOI(doi);
+						bibtex = this.plugin.formatBibTeX(rawBibTeX);
 					} catch (error) {
 						console.warn('Failed to fetch BibTeX from CrossRef:', error);
 						// Fallback to manual generation if API fails
 						const metadataForBibTeX = await this.fetchDOIMetadata(doi);
 						if (metadataForBibTeX) {
-							bibtex = this.generateBibTeX(metadataForBibTeX, doi);
+							const rawBibTeX = this.generateBibTeX(metadataForBibTeX, doi);
+							bibtex = this.plugin.formatBibTeX(rawBibTeX);
 						}
 					}
 				}
@@ -1320,8 +1384,8 @@ class STANoteCreationModal extends Modal {
 					const bibtex = await this.fetchBibTeXFromDOI(doi);
 					if (bibtex) {
 						new Notice('✅ DOI metadata and BibTeX citation loaded successfully!');
-						// Store BibTeX for later use when creating the note
-						(this as any).fetchedBibTeX = bibtex;
+						// Store formatted BibTeX for later use when creating the note
+						(this as any).fetchedBibTeX = this.plugin.formatBibTeX(bibtex);
 					} else {
 						new Notice('✅ DOI metadata loaded (BibTeX generation will be manual)');
 					}

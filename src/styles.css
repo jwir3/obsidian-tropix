@@ -794,3 +794,91 @@
 .theme-dark .sta-sources-listbox option {
     background-color: var(--background-primary-alt);
 }
+
+/* Tropical Callout Styles */
+
+/* Source callouts - Wave/Ocean theme */
+.callout[data-callout="author"] {
+    --callout-color: 59, 130, 246;
+    --callout-icon: lucide-waves;
+}
+
+.callout[data-callout="summary"] {
+    --callout-color: 14, 165, 233;
+    --callout-icon: lucide-waves;
+}
+
+.callout[data-callout="quote"] {
+    --callout-color: 6, 182, 212;
+    --callout-icon: lucide-waves;
+}
+
+.callout[data-callout="note"] {
+    --callout-color: 8, 145, 178;
+    --callout-icon: lucide-droplets;
+}
+
+/* Topic callouts - Branch/Frond theme for "Relevant Topics" */
+.callout[data-callout="info"] {
+    --callout-color: 34, 197, 94;
+    --callout-icon: lucide-sprout;
+}
+
+/* Argument callouts - Tropical flower theme */
+.callout[data-callout="tip"] {
+    --callout-color: 236, 72, 153;
+    --callout-icon: lucide-flower;
+}
+
+.callout[data-callout="warning"] {
+    --callout-color: 251, 146, 60;
+    --callout-icon: lucide-flower-2;
+}
+
+/* Example callouts (Sources in topics) - Keep wave theme */
+.callout[data-callout="example"] {
+    --callout-color: 59, 130, 246;
+    --callout-icon: lucide-waves;
+}
+
+/* Background color adjustments for tropical theme */
+.callout[data-callout="author"],
+.callout[data-callout="summary"],
+.callout[data-callout="quote"],
+.callout[data-callout="note"],
+.callout[data-callout="example"] {
+    background-color: rgba(var(--callout-color), 0.1);
+    border-color: rgba(var(--callout-color), 0.4);
+}
+
+.callout[data-callout="info"] {
+    background-color: rgba(34, 197, 94, 0.1);
+    border-color: rgba(34, 197, 94, 0.4);
+}
+
+.callout[data-callout="tip"],
+.callout[data-callout="warning"] {
+    background-color: rgba(var(--callout-color), 0.1);
+    border-color: rgba(var(--callout-color), 0.4);
+}
+
+/* Dark theme adjustments */
+.theme-dark .callout[data-callout="author"],
+.theme-dark .callout[data-callout="summary"],
+.theme-dark .callout[data-callout="quote"],
+.theme-dark .callout[data-callout="note"],
+.theme-dark .callout[data-callout="example"] {
+    background-color: rgba(var(--callout-color), 0.15);
+    border-color: rgba(var(--callout-color), 0.6);
+}
+
+.theme-dark .callout[data-callout="info"] {
+    background-color: rgba(34, 197, 94, 0.15);
+    border-color: rgba(34, 197, 94, 0.6);
+}
+
+.theme-dark .callout[data-callout="tip"],
+.theme-dark .callout[data-callout="warning"] {
+    background-color: rgba(var(--callout-color), 0.15);
+    border-color: rgba(var(--callout-color), 0.6);
+}

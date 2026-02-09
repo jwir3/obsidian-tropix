@@ -17,6 +17,9 @@ export interface STAPluginSettings {
 	argumentTags: string[];
 	// File explorer labels
 	showFileExplorerLabels: boolean;
+	// Recent sources tracking
+	recentSources: RecentSource[];
+	maxRecentSources: number;
 }
 
 export type STANoteType = 'source' | 'topic' | 'argument';
@@ -48,6 +51,12 @@ export interface SourceMetadata {
 	journal?: string;
 	pdfLink?: string;
 	rating?: number;
+}
+
+export interface RecentSource {
+	path: string;
+	title: string;
+	lastAccessed: number;
 }
 
 export interface DOIMetadata {

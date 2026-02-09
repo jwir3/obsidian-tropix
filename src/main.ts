@@ -1,5 +1,5 @@
 import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting, TFile, TFolder } from 'obsidian';
-import { STAPluginSettings, STANoteType, STANote, STASearchResult, DEFAULT_FOLDERS, STA_NOTE_TYPES } from './types';
+import { STAPluginSettings, STANoteType, STANote, STASearchResult, DEFAULT_FOLDERS, STA_NOTE_TYPES, RecentSource } from './types';
 import { DEFAULT_TEMPLATES } from './templates';
 // Use emoji icons for tropical theme
 
@@ -19,7 +19,10 @@ const DEFAULT_SETTINGS: STAPluginSettings = {
 	topicTags: ['topic', 'theme', 'subject'],
 	argumentTags: ['argument', 'claim', 'position'],
 	// File explorer labels
-	showFileExplorerLabels: true
+	showFileExplorerLabels: true,
+	// Recent sources tracking
+	recentSources: [],
+	maxRecentSources: 10
 };
 
 export default class STAPlugin extends Plugin {
@@ -29,6 +32,15 @@ export default class STAPlugin extends Plugin {
 
 	async onload() {
 		await this.loadSettings();
+
+		// Track when files are opened to update recent sources
+		this.registerEvent(
+			this.app.workspace.on('file-open', (file) => {
+				if (file instanceof TFile) {
+					this.trackRecentSource(file);
+				}
+			})
+		);
 
 		// Add context menu items for folders and files
 		this.registerEvent(
@@ -292,6 +304,75 @@ export default class STAPlugin extends Plugin {
 		await this.saveData(this.settings);
 	}
 
+	// Recent sources tracking methods
+	async trackRecentSource(file: TFile) {
+		if (!file) return;
+
+		// Only track source notes
+		const noteType = await this.identifyNoteType(file);
+		if (noteType !== 'source') return;
+
+		const title = file.basename;
+		const now = Date.now();
+
+		// Remove existing entry if it exists
+		this.settings.recentSources = this.settings.recentSources.filter(
+			source => source.path !== file.path
+		);
+
+		// Add to front of list
+		this.settings.recentSources.unshift({
+			path: file.path,
+			title: title,
+			lastAccessed: now
+		});
+
+		// Limit to max recent sources
+		if (this.settings.recentSources.length > this.settings.maxRecentSources) {
+			this.settings.recentSources = this.settings.recentSources.slice(0, this.settings.maxRecentSources);
+		}
+
+		await this.saveSettings();
+	}
+
+	async getRecentSources(): Promise<RecentSource[]> {
+		// Filter out sources that no longer exist
+		const validSources = [];
+		for (const source of this.settings.recentSources) {
+			const file = this.app.vault.getAbstractFileByPath(source.path);
+			if (file instanceof TFile) {
+				validSources.push(source);
+			}
+		}
+
+		// Update settings if we removed any invalid sources
+		if (validSources.length !== this.settings.recentSources.length) {
+			this.settings.recentSources = validSources;
+			await this.saveSettings();
+		}
+
+		return validSources;
+	}
+
+	generateSourcesList(sourcePaths: string[]): string {
+		if (!sourcePaths || sourcePaths.length === 0) {
+			return '';
+		}
+
+		const sourceLinks = [];
+		for (let i = 0; i < sourcePaths.length; i++) {
+			const path = sourcePaths[i];
+			const file = this.app.vault.getAbstractFileByPath(path);
+			if (file instanceof TFile) {
+				const title = file.basename;
+				const link = `[[${path}|${title}]]`;
+				sourceLinks.push(`${i + 1}. ${link}`);
+			}
+		}
+
+		return sourceLinks.join('\n');
+	}
+
 	async createSTANote(type: STANoteType) {
 		const modal = new STANoteCreationModal(this.app, this, type);
 		modal.open();
@@ -351,6 +432,19 @@ export default class STAPlugin extends Plugin {
 				.replace(/(> \[!summary\])\s*(\n\n)/m, `$1\n>${metadata.summary || ''}$2`)
 				.replace(/### \[Link To PDF\]\(\)/, `### [Link To PDF](${metadata.pdfLink || ''})`)
 				.replace(/(> \[!note\] BibTeX Citation)\s*$/m, bibtexContent);
+		}
+
+		// Apply topic/argument-specific metadata if provided
+		if ((type === 'topic' || type === 'argument') && metadata && metadata.selectedSources) {
+			const sourcesList = this.generateSourcesList(metadata.selectedSources);
+
+			if (type === 'topic') {
+				// Replace the "Sources" section in topic template
+				content = content.replace(/(> \[!example\] Sources)\s*$/m, `$1\n>\n${sourcesList.split('\n').map(line => `> ${line}`).join('\n')}`);
+			} else if (type === 'argument') {
+				// Replace the "Sources" section in argument template
+				content = content.replace(/(> \[!info\] Sources)\s*$/m, `$1\n>\n${sourcesList.split('\n').map(line => `> ${line}`).join('\n')}`);
+			}
 		}
 
 		try {
@@ -962,6 +1056,10 @@ class STANoteCreationModal extends Modal {
 	starRating: number = 0;
 	starElements: HTMLElement[] = [];
 
+	// Recent sources selection (for topic and argument notes)
+	selectedSources: string[] = [];
+	sourcesListBox?: HTMLSelectElement;
+
 	constructor(app: App, plugin: STAPlugin, type: STANoteType, defaultFolder?: string) {
 		super(app);
 		this.plugin = plugin;
@@ -969,7 +1067,7 @@ class STANoteCreationModal extends Modal {
 		this.defaultFolder = defaultFolder;
 	}
 
-	onOpen() {
+	async onOpen() {
 		const { contentEl } = this;
 		contentEl.createEl('h2', { text: `Create ${this.type.charAt(0).toUpperCase() + this.type.slice(1)} Note` });
 
@@ -1064,6 +1162,11 @@ class STANoteCreationModal extends Modal {
 			});
 		}
 
+		// Add recent sources selector for topic and argument notes
+		if (this.type === 'topic' || this.type === 'argument') {
+			await this.addRecentSourcesSelector(form);
+		}
+
 		// Folder input
 		form.createEl('label', { text: 'Folder (optional):' });
 		this.folderInput = form.createEl('input', {
@@ -1086,6 +1189,42 @@ class STANoteCreationModal extends Modal {
 			if (e.key === 'Enter') {
 				this.createNote();
 			}
+		});
+	}
+
+	async addRecentSourcesSelector(form: HTMLElement) {
+		const recentSources = await this.plugin.getRecentSources();
+
+		if (recentSources.length === 0) {
+			return; // No recent sources to show
+		}
+
+		form.createEl('label', { text: 'Related Sources (optional):' });
+
+		// Create container for sources selection
+		const sourcesContainer = form.createDiv('sta-sources-container');
+
+		// Create multi-select listbox
+		this.sourcesListBox = sourcesContainer.createEl('select');
+		this.sourcesListBox.multiple = true;
+		this.sourcesListBox.size = Math.max(3, Math.min(8, recentSources.length)); // Show 3-8 items
+		this.sourcesListBox.classList.add('sta-sources-listbox');
+
+		// Populate with recent sources
+		for (const source of recentSources) {
+			const option = this.sourcesListBox.createEl('option');
+			option.value = source.path;
+			option.textContent = source.title;
+		}
+
+		// Add instructions
+		const instructions = sourcesContainer.createEl('div');
+		instructions.classList.add('sta-sources-instructions');
+		instructions.textContent = 'Hold Ctrl/Cmd to select multiple sources';
+
+		// Track selections
+		this.sourcesListBox.addEventListener('change', () => {
+			this.selectedSources = Array.from(this.sourcesListBox!.selectedOptions).map(option => option.value);
 		});
 	}
 
@@ -1112,7 +1251,7 @@ class STANoteCreationModal extends Modal {
 
 		const folder = this.folderInput.value.trim() || undefined;
 
-		// Collect source metadata if this is a source note
+		// Collect metadata based on note type
 		let metadata;
 		if (this.type === 'source') {
 			const doi = this.doiInput?.value.trim() || '';
@@ -1146,6 +1285,11 @@ class STANoteCreationModal extends Modal {
 				pdfLink: this.pdfLinkInput?.value.trim() || '',
 				rating: this.starRating,
 				bibtex: bibtex
+			};
+		} else if (this.type === 'topic' || this.type === 'argument') {
+			// Add selected sources to metadata
+			metadata = {
+				selectedSources: this.selectedSources
 			};
 		}
 
@@ -1385,6 +1529,8 @@ class STANoteCreationModal extends Modal {
 			}
 		});
 	}
+
+
 
 	onClose() {
 		const { contentEl } = this;

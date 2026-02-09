@@ -736,3 +736,61 @@
     color: var(--text-normal);
     border-color: var(--background-modifier-border);
 }
+
+/* Recent sources selector styling */
+.sta-sources-container {
+    margin: 15px 0;
+}
+
+.sta-sources-listbox {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 4px;
+    background-color: var(--background-primary);
+    color: var(--text-normal);
+    font-size: 14px;
+    font-family: var(--font-interface);
+    min-height: 120px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.sta-sources-listbox:focus {
+    outline: none;
+    border-color: var(--interactive-accent);
+    box-shadow: 0 0 0 2px var(--interactive-accent-alpha);
+}
+
+.sta-sources-listbox option {
+    padding: 8px 12px;
+    background-color: var(--background-primary);
+    color: var(--text-normal);
+    line-height: 1.4;
+    min-height: 28px;
+}
+
+.sta-sources-listbox option:checked {
+    background-color: var(--interactive-accent);
+    color: var(--text-on-accent);
+}
+
+.sta-sources-listbox option:hover {
+    background-color: var(--background-modifier-hover);
+}
+
+.sta-sources-instructions {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 5px;
+    font-style: italic;
+}
+
+/* Dark theme adjustments for sources selector */
+.theme-dark .sta-sources-listbox {
+    background-color: var(--background-primary-alt);
+}
+
+.theme-dark .sta-sources-listbox option {
+    background-color: var(--background-primary-alt);
+}

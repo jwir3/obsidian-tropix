@@ -906,3 +906,79 @@
     background-color: rgba(var(--callout-color), 0.15);
     border-color: rgba(var(--callout-color), 0.6);
 }
+
+/* PDF Upload Styles */
+.sta-pdf-dropzone {
+    border: 2px dashed var(--interactive-accent);
+    border-radius: 8px;
+    padding: 40px 20px;
+    text-align: center;
+    margin: 10px 0;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background-color: rgba(var(--interactive-accent-rgb), 0.05);
+}
+
+.sta-pdf-dropzone:hover {
+    border-color: var(--interactive-accent-hover);
+    background-color: rgba(var(--interactive-accent-rgb), 0.1);
+}
+
+.sta-pdf-dropzone.sta-dropzone-dragover {
+    border-color: var(--interactive-accent-hover);
+    background-color: rgba(var(--interactive-accent-rgb), 0.15);
+    border-style: solid;
+}
+
+.sta-dropzone-text {
+    color: var(--text-muted);
+    font-size: 16px;
+    font-weight: 500;
+    margin: 0;
+}
+
+.sta-dropzone-success {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+}
+
+.sta-dropzone-success .sta-dropzone-text {
+    color: var(--text-success);
+    font-weight: 600;
+}
+
+.sta-remove-pdf {
+    background-color: var(--interactive-normal);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 4px;
+    padding: 6px 12px;
+    color: var(--text-normal);
+    cursor: pointer;
+    font-size: 12px;
+    transition: all 0.2s ease;
+}
+
+.sta-remove-pdf:hover {
+    background-color: var(--interactive-hover);
+    border-color: var(--background-modifier-border-hover);
+}
+
+.theme-dark .sta-pdf-dropzone {
+    border-color: var(--interactive-accent);
+    background-color: rgba(var(--interactive-accent-rgb), 0.08);
+}
+
+.theme-dark .sta-pdf-dropzone:hover {
+    background-color: rgba(var(--interactive-accent-rgb), 0.12);
+}
+
+.theme-dark .sta-pdf-dropzone.sta-dropzone-dragover {
+    background-color: rgba(var(--interactive-accent-rgb), 0.18);
+}
+
+/* Hidden PDF files styling */
+.tropix-hidden-pdf {
+    display: none !important;
+}

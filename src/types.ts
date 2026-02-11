@@ -17,6 +17,8 @@ export interface STAPluginSettings {
 	argumentTags: string[];
 	// File explorer labels
 	showFileExplorerLabels: boolean;
+	// PDF handling
+	hidePDFsInExplorer: boolean;
 	// Recent sources tracking
 	recentSources: RecentSource[];
 	maxRecentSources: number;
@@ -53,6 +55,7 @@ export interface SourceMetadata {
 	year?: string;
 	journal?: string;
 	pdfLink?: string;
+	pdfFile?: string;
 	rating?: number;
 }
 
@@ -110,6 +113,12 @@ export interface STAModalConfig {
 	template?: string;
 }
 
+export interface PDFUploadResult {
+	fileName: string;
+	filePath: string;
+	relativePath: string;
+}
+
 // Plugin event types
 export interface STAPluginEvents {
 	'sta:note-created': (note: STANote) => void;
@@ -152,7 +161,8 @@ export const TEMPLATE_VARIABLES = {
 	DATE: '{{date}}',
 	AUTHOR: '{{author}}',
 	URL: '{{url}}',
-	POSITION: '{{position}}'
+	POSITION: '{{position}}',
+	INLINE_PDF: '{{inlinePdf}}'
 } as const;
 
 // Default tag configurations

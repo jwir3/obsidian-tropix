@@ -1,5 +1,5 @@
 import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting, TFile, TFolder } from 'obsidian';
-import { STAPluginSettings, STANoteType, STANote, STASearchResult, DEFAULT_FOLDERS, STA_NOTE_TYPES, RecentSource, RecentTopic } from './types';
+import { STAPluginSettings, STANoteType, STANote, STASearchResult, DEFAULT_FOLDERS, STA_NOTE_TYPES, RecentSource, RecentTopic, PDFUploadResult } from './types';
 import { DEFAULT_TEMPLATES } from './templates';
 // Use emoji icons for tropical theme
 
@@ -20,6 +20,8 @@ const DEFAULT_SETTINGS: STAPluginSettings = {
 	argumentTags: ['argument', 'claim', 'position'],
 	// File explorer labels
 	showFileExplorerLabels: true,
+	// PDF handling
+	hidePDFsInExplorer: true,
 	// Recent sources tracking
 	recentSources: [],
 	maxRecentSources: 20,
@@ -32,6 +34,8 @@ export default class STAPlugin extends Plugin {
 	settings: STAPluginSettings;
 	private fileLabels: Map<string, STANoteType> = new Map();
 	private fileExplorerMutationObserver?: MutationObserver;
+	private pdfReferences: Map<string, string> = new Map(); // PDF path -> Source note path
+	hiddenPDFs: Set<string> = new Set();
 
 	async onload() {
 		await this.loadSettings();
@@ -508,7 +512,12 @@ export default class STAPlugin extends Plugin {
 				.replace(/Rating:\s*0\/5/m, `Rating: ${metadata.rating || 0}/5`)
 				.replace(/(> \[!author\])\s*(\n\n)/m, `$1\n>${metadata.author || ''}$2`)
 				.replace(/(> \[!summary\])\s*(\n\n)/m, `$1\n>${metadata.summary || ''}$2`)
-				.replace(/### \[Link To PDF\]\(\)/, `### [Link To PDF](${metadata.pdfLink || ''})`)
+				.replace(/PDF file:\s*$/m, `PDF file: ${metadata.pdfFile || ''}`)
+				.replace(/{{inlinePdf}}/g, (() => {
+					const pdfContent = metadata.inlinePdf || '';
+					console.log(`TropiX: Replacing {{inlinePdf}} with: "${pdfContent}"`);
+					return pdfContent;
+				})())
 				.replace(/(> \[!note\] BibTeX Citation)\s*$/m, bibtexContent);
 		}
 
@@ -880,6 +889,8 @@ export default class STAPlugin extends Plugin {
 		this.app.workspace.onLayoutReady(() => {
 			this.setupFileExplorerObserver();
 			this.refreshAllFileLabels();
+			// Initialize PDF scanning
+			setTimeout(() => this.scanPDFReferences(), 500);
 		});
 
 		// Listen for file changes
@@ -887,6 +898,13 @@ export default class STAPlugin extends Plugin {
 			this.app.vault.on('modify', (file) => {
 				if (file instanceof TFile && file.extension === 'md') {
 					this.updateFileLabel(file);
+					// Re-scan PDF references if it's a source note
+					setTimeout(async () => {
+						const noteType = await this.identifyNoteType(file);
+						if (noteType === 'source') {
+							await this.scanPDFReferences();
+						}
+					}, 100);
 				}
 			})
 		);
@@ -895,6 +913,16 @@ export default class STAPlugin extends Plugin {
 			this.app.vault.on('create', (file) => {
 				if (file instanceof TFile && file.extension === 'md') {
 					setTimeout(() => this.updateFileLabel(file), 100);
+					// Re-scan PDF references if it's a source note
+					setTimeout(async () => {
+						const noteType = await this.identifyNoteType(file);
+						if (noteType === 'source') {
+							await this.scanPDFReferences();
+						}
+					}, 200);
+				} else if (file instanceof TFile && file.extension === 'pdf') {
+					// Check if this PDF should be hidden
+					setTimeout(() => this.scanPDFReferences(), 100);
 				}
 			})
 		);
@@ -903,6 +931,12 @@ export default class STAPlugin extends Plugin {
 			this.app.vault.on('delete', (file) => {
 				if (file instanceof TFile) {
 					this.fileLabels.delete(file.path);
+					// Clean up PDF references if needed
+					if (file.extension === 'pdf' || file.extension === 'md') {
+						this.pdfReferences.delete(file.path);
+						this.hiddenPDFs.delete(file.path);
+						setTimeout(() => this.scanPDFReferences(), 100);
+					}
 				}
 			})
 		);
@@ -915,6 +949,18 @@ export default class STAPlugin extends Plugin {
 					if (label) {
 						this.fileLabels.set(file.path, label);
 					}
+				}
+				// Update PDF references for renamed files
+				if (file instanceof TFile && (file.extension === 'pdf' || file.extension === 'md')) {
+					if (this.pdfReferences.has(oldPath)) {
+						const sourceNote = this.pdfReferences.get(oldPath);
+						this.pdfReferences.delete(oldPath);
+						if (sourceNote) {
+							this.pdfReferences.set(file.path, sourceNote);
+						}
+					}
+					this.hiddenPDFs.delete(oldPath);
+					setTimeout(() => this.scanPDFReferences(), 100);
 				}
 			})
 		);
@@ -943,7 +989,10 @@ export default class STAPlugin extends Plugin {
 
 		this.fileExplorerMutationObserver = new MutationObserver((mutations) => {
 			// Use a longer delay to ensure DOM is fully updated
-			setTimeout(() => this.refreshVisibleFileLabels(), 100);
+			setTimeout(() => {
+				this.refreshVisibleFileLabels();
+				this.hidePDFElements();
+			}, 100);
 		});
 
 		this.fileExplorerMutationObserver.observe(targetNode, {
@@ -1095,6 +1144,197 @@ export default class STAPlugin extends Plugin {
 				}
 			}
 		}
+
+	}
+
+	// PDF Reference Management Methods
+	async scanPDFReferences() {
+		this.pdfReferences.clear();
+		this.hiddenPDFs.clear();
+
+		if (!this.settings.hidePDFsInExplorer) {
+			return;
+		}
+
+		const files = this.app.vault.getMarkdownFiles();
+
+		for (const file of files) {
+			const noteType = await this.identifyNoteType(file);
+			if (noteType === 'source') {
+				await this.scanSourceForPDFReferences(file);
+			}
+		}
+
+		this.updatePDFVisibility();
+	}
+
+	async scanSourceForPDFReferences(file: TFile) {
+		try {
+			const content = await this.app.vault.read(file);
+			const folder = file.parent?.path || '';
+
+			// Look for PDF file metadata field
+			const pdfFileMatch = content.match(/^PDF file:\s*(.+)$/m);
+			if (pdfFileMatch && pdfFileMatch[1].trim()) {
+				const pdfFileName = pdfFileMatch[1].trim();
+				const pdfPath = folder ? `${folder}/${pdfFileName}` : pdfFileName;
+				this.pdfReferences.set(pdfPath, file.path);
+				this.hiddenPDFs.add(pdfPath);
+			}
+
+			// Look for PDFs in the PDF section
+			const pdfSectionRegex = /###\s*PDF\s*([\s\S]*?)(?=\n#{1,3}\s|\n>\s*\[!|$)/i;
+			const pdfSectionMatch = content.match(pdfSectionRegex);
+			if (pdfSectionMatch && pdfSectionMatch[1]) {
+				const pdfSection = pdfSectionMatch[1];
+
+				// Look for PDF++ inline format ![[filename.pdf]]
+				const inlinePdfMatches = pdfSection.matchAll(/!\[\[([^|\]]+\.pdf)(?:\|[^\]]+)?\]\]/g);
+				for (const match of inlinePdfMatches) {
+					const pdfFileName = match[1];
+					const pdfPath = folder ? `${folder}/${pdfFileName}` : pdfFileName;
+					this.pdfReferences.set(pdfPath, file.path);
+					this.hiddenPDFs.add(pdfPath);
+				}
+
+				// Look for bulleted links - [filename](path.pdf)
+				const bulletLinkMatches = pdfSection.matchAll(/\-\s*\[([^\]]+)\]\(([^)]+\.pdf)\)/g);
+				for (const match of bulletLinkMatches) {
+					const pdfFileName = match[2];
+					const pdfPath = folder ? `${folder}/${pdfFileName}` : pdfFileName;
+					this.pdfReferences.set(pdfPath, file.path);
+					this.hiddenPDFs.add(pdfPath);
+				}
+			}
+
+			// Look for PDF file links in content
+			const pdfLinkMatches = content.matchAll(/\[\[([^|\]]+\.pdf)(?:\|[^\]]+)?\]\]/g);
+			for (const match of pdfLinkMatches) {
+				const pdfFileName = match[1];
+				const pdfPath = folder ? `${folder}/${pdfFileName}` : pdfFileName;
+				this.pdfReferences.set(pdfPath, file.path);
+				this.hiddenPDFs.add(pdfPath);
+			}
+
+		} catch (error) {
+			console.warn('Failed to scan PDF references in', file.path, error);
+		}
+	}
+
+	updatePDFVisibility() {
+		if (!this.settings.hidePDFsInExplorer) {
+			return;
+		}
+
+		const fileExplorer = this.app.workspace.getLeavesOfType('file-explorer')[0];
+		if (!fileExplorer) return;
+
+		const explorerView = fileExplorer.view as any;
+		if (!explorerView) return;
+
+		// Hide PDF files that are referenced by source notes
+		setTimeout(() => {
+			this.hidePDFElements();
+		}, 100);
+	}
+
+	hidePDFElements() {
+		const fileExplorer = this.app.workspace.getLeavesOfType('file-explorer')[0];
+		if (!fileExplorer) return;
+
+		const explorerView = fileExplorer.view as any;
+		const containerEl = explorerView.containerEl || explorerView.contentEl;
+		if (!containerEl) return;
+
+		// Find all file elements
+		const fileElements = containerEl.querySelectorAll('.nav-file');
+
+		for (const fileElement of fileElements) {
+			const titleEl = fileElement.querySelector('.nav-file-title');
+			if (!titleEl) continue;
+
+			const fileName = titleEl.getAttribute('data-path') || titleEl.textContent;
+			if (!fileName || !fileName.endsWith('.pdf')) continue;
+
+			const shouldHide = this.hiddenPDFs.has(fileName) ||
+							  Array.from(this.hiddenPDFs).some(hiddenPath =>
+								  hiddenPath.endsWith(fileName)
+							  );
+
+			if (shouldHide) {
+				fileElement.style.display = 'none';
+				fileElement.classList.add('tropix-hidden-pdf');
+			} else {
+				fileElement.style.display = '';
+				fileElement.classList.remove('tropix-hidden-pdf');
+			}
+		}
+	}
+
+	async uploadPDFFile(file: File, targetFolder: string): Promise<PDFUploadResult> {
+		try {
+			// Sanitize filename
+			const sanitizedName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+			const fileName = sanitizedName.endsWith('.pdf') ? sanitizedName : `${sanitizedName}.pdf`;
+
+			// Create the file path
+			const filePath = targetFolder ? `${targetFolder}/${fileName}` : fileName;
+
+			// Read file as array buffer
+			const arrayBuffer = await file.arrayBuffer();
+
+			// Create the file in Obsidian vault
+			await this.app.vault.createBinary(filePath, arrayBuffer);
+
+			// Update PDF references
+			await this.scanPDFReferences();
+
+			return {
+				fileName,
+				filePath,
+				relativePath: fileName
+			};
+
+		} catch (error) {
+			console.error('Failed to upload PDF:', error);
+			throw new Error(`Failed to upload PDF: ${error.message}`);
+		}
+	}
+
+	isPDFPlusPluginAvailable(): boolean {
+		// Check if PDF++ plugin is installed and enabled (ID: pdf-plus)
+		const app = this.app as any;
+		const plugins = app.plugins?.plugins;
+
+		if (!plugins) return false;
+
+		// Check for the correct PDF++ plugin ID
+		const pdfPlusPlugin = plugins['pdf-plus'];
+		if (pdfPlusPlugin && (pdfPlusPlugin.enabled || pdfPlusPlugin._loaded)) {
+			console.log('TropiX: PDF++ plugin detected and enabled');
+			return true;
+		}
+
+		console.log('TropiX: PDF++ plugin not detected or not enabled');
+		return false;
+	}
+
+	generateInlinePDFContent(fileName: string, filePath: string): string {
+		const hasPdfPlus = this.isPDFPlusPluginAvailable();
+		console.log(`TropiX: Generating PDF content for ${fileName}, PDF++ available: ${hasPdfPlus}`);
+
+		if (hasPdfPlus) {
+			// Use PDF++ inline format
+			const content = `![[${fileName}]]`;
+			console.log(`TropiX: Generated PDF++ inline content: ${content}`);
+			return content;
+		} else {
+			// Use bulleted link format
+			const displayName = fileName.replace('.pdf', '');
+			const content = `- [${displayName}](${fileName})`;
+			console.log(`TropiX: Generated bulleted link content: ${content}`);
+			return content;
+		}
 	}
 }
 
@@ -1223,6 +1463,11 @@ class STANoteCreationModal extends Modal {
 	selectedSourcesDisplay?: HTMLElement;
 	selectedTopicsDisplay?: HTMLElement;
 
+	// PDF upload fields
+	pdfDropZone?: HTMLElement;
+	uploadedPDF?: PDFUploadResult;
+	pdfFileInput?: HTMLInputElement;
+
 	constructor(app: App, plugin: STAPlugin, type: STANoteType, defaultFolder?: string) {
 		super(app);
 		this.plugin = plugin;
@@ -1292,6 +1537,25 @@ class STANoteCreationModal extends Modal {
 				type: 'text',
 				placeholder: 'https://example.com/paper.pdf'
 			});
+
+			// PDF Upload section
+			form.createEl('label', { text: 'PDF Upload (optional):' });
+			this.pdfDropZone = form.createDiv('sta-pdf-dropzone');
+			this.pdfDropZone.createEl('div', {
+				text: '📎 Drag and drop PDF file here or click to browse',
+				cls: 'sta-dropzone-text'
+			});
+
+			// Hidden file input for clicking to browse
+			this.pdfFileInput = form.createEl('input', {
+				type: 'file',
+				attr: {
+					accept: '.pdf',
+					style: 'display: none;'
+				}
+			});
+
+			this.setupPDFUpload();
 
 			// Rating input with stars
 			form.createEl('label', { text: 'Rating (optional):' });
@@ -1528,6 +1792,10 @@ class STANoteCreationModal extends Modal {
 				}
 			}
 
+			const inlinePdf = this.uploadedPDF
+				? this.plugin.generateInlinePDFContent(this.uploadedPDF.fileName, this.uploadedPDF.filePath)
+				: '';
+
 			metadata = {
 				author: this.authorInput?.value.trim() || '',
 				doi: doi,
@@ -1535,6 +1803,8 @@ class STANoteCreationModal extends Modal {
 				year: this.yearInput?.value.trim() || '',
 				journal: this.journalInput?.value.trim() || '',
 				pdfLink: this.pdfLinkInput?.value.trim() || '',
+				pdfFile: this.uploadedPDF?.fileName || '',
+				inlinePdf: inlinePdf,
 				rating: this.starRating,
 				bibtex: bibtex
 			};
@@ -1783,6 +2053,114 @@ class STANoteCreationModal extends Modal {
 	}
 
 
+
+	setupPDFUpload() {
+		if (!this.pdfDropZone || !this.pdfFileInput) return;
+
+		// Click to browse
+		this.pdfDropZone.addEventListener('click', () => {
+			this.pdfFileInput?.click();
+		});
+
+		// File input change
+		this.pdfFileInput.addEventListener('change', async (event) => {
+			const target = event.target as HTMLInputElement;
+			if (target.files && target.files[0]) {
+				await this.handlePDFUpload(target.files[0]);
+			}
+		});
+
+		// Drag and drop events
+		this.pdfDropZone.addEventListener('dragover', (e) => {
+			e.preventDefault();
+			this.pdfDropZone?.classList.add('sta-dropzone-dragover');
+		});
+
+		this.pdfDropZone.addEventListener('dragleave', (e) => {
+			e.preventDefault();
+			this.pdfDropZone?.classList.remove('sta-dropzone-dragover');
+		});
+
+		this.pdfDropZone.addEventListener('drop', async (e) => {
+			e.preventDefault();
+			this.pdfDropZone?.classList.remove('sta-dropzone-dragover');
+
+			const files = e.dataTransfer?.files;
+			if (files && files[0] && files[0].type === 'application/pdf') {
+				await this.handlePDFUpload(files[0]);
+			} else {
+				new Notice('Please drop a PDF file');
+			}
+		});
+	}
+
+	async handlePDFUpload(file: File) {
+		if (!file.type.includes('pdf')) {
+			new Notice('Please select a PDF file');
+			return;
+		}
+
+		try {
+			// Show loading state
+			if (this.pdfDropZone) {
+				this.pdfDropZone.innerHTML = '<div class="sta-dropzone-text">📤 Uploading PDF...</div>';
+			}
+
+			// Get target folder
+			const targetFolder = this.folderInput.value.trim() || this.getDefaultFolder();
+
+			// Upload the PDF
+			this.uploadedPDF = await this.plugin.uploadPDFFile(file, targetFolder);
+
+			// Update UI
+			if (this.pdfDropZone) {
+				this.pdfDropZone.innerHTML = `
+					<div class="sta-dropzone-success">
+						<div class="sta-dropzone-text">✅ PDF uploaded: ${this.uploadedPDF.fileName}</div>
+						<button type="button" class="sta-remove-pdf">Remove</button>
+					</div>
+				`;
+
+				// Add remove functionality
+				const removeBtn = this.pdfDropZone.querySelector('.sta-remove-pdf') as HTMLButtonElement;
+				removeBtn?.addEventListener('click', () => {
+					this.removePDFUpload();
+				});
+			}
+
+			// Clear the PDF link input since we're using uploaded file
+			if (this.pdfLinkInput) {
+				this.pdfLinkInput.value = '';
+			}
+
+			new Notice('PDF uploaded successfully!');
+
+		} catch (error) {
+			console.error('PDF upload failed:', error);
+			new Notice('Failed to upload PDF: ' + error.message);
+			this.resetPDFDropZone();
+		}
+	}
+
+	removePDFUpload() {
+		if (this.uploadedPDF) {
+			// Try to delete the uploaded file
+			const file = this.plugin.app.vault.getAbstractFileByPath(this.uploadedPDF.filePath);
+			if (file) {
+				this.plugin.app.vault.delete(file);
+			}
+			this.uploadedPDF = undefined;
+		}
+		this.resetPDFDropZone();
+		new Notice('PDF removed');
+	}
+
+	resetPDFDropZone() {
+		if (this.pdfDropZone) {
+			this.pdfDropZone.innerHTML = '<div class="sta-dropzone-text">📎 Drag and drop PDF file here or click to browse</div>';
+			this.setupPDFUpload();
+		}
+	}
 
 	onClose() {
 		const { contentEl } = this;
@@ -2116,6 +2494,24 @@ class STASettingTab extends PluginSettingTab {
 						this.plugin.initializeFileLabeling();
 					} else {
 						this.plugin.cleanupFileLabeling();
+					}
+				}));
+
+		new Setting(containerEl)
+			.setName('Hide referenced PDFs in file explorer')
+			.setDesc('Hide PDF files from the file explorer when they are referenced by source notes. PDFs without corresponding source notes will still be visible.')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.hidePDFsInExplorer)
+				.onChange(async (value) => {
+					this.plugin.settings.hidePDFsInExplorer = value;
+					await this.plugin.saveSettings();
+					// Re-scan PDF references when setting changes
+					if (value) {
+						await this.plugin.scanPDFReferences();
+					} else {
+						// Show all PDFs again
+						this.plugin.hiddenPDFs.clear();
+						this.plugin.hidePDFElements();
 					}
 				}));
 

@@ -1,5 +1,5 @@
 import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting, TFile, TFolder } from 'obsidian';
-import { STAPluginSettings, STANoteType, STANote, STASearchResult, DEFAULT_FOLDERS, STA_NOTE_TYPES, RecentSource } from './types';
+import { STAPluginSettings, STANoteType, STANote, STASearchResult, DEFAULT_FOLDERS, STA_NOTE_TYPES, RecentSource, RecentTopic } from './types';
 import { DEFAULT_TEMPLATES } from './templates';
 // Use emoji icons for tropical theme
 
@@ -22,7 +22,10 @@ const DEFAULT_SETTINGS: STAPluginSettings = {
 	showFileExplorerLabels: true,
 	// Recent sources tracking
 	recentSources: [],
-	maxRecentSources: 10
+	maxRecentSources: 20,
+	// Recent topics tracking
+	recentTopics: [],
+	maxRecentTopics: 16
 };
 
 export default class STAPlugin extends Plugin {
@@ -38,6 +41,7 @@ export default class STAPlugin extends Plugin {
 			this.app.workspace.on('file-open', (file) => {
 				if (file instanceof TFile) {
 					this.trackRecentSource(file);
+					this.trackRecentTopic(file);
 				}
 			})
 		);
@@ -335,13 +339,46 @@ export default class STAPlugin extends Plugin {
 		await this.saveSettings();
 	}
 
+	async trackRecentTopic(file: TFile) {
+		if (!file) return;
+
+		// Only track topic notes
+		const noteType = await this.identifyNoteType(file);
+		if (noteType !== 'topic') return;
+
+		const title = file.basename;
+		const now = Date.now();
+
+		// Remove existing entry if it exists
+		this.settings.recentTopics = this.settings.recentTopics.filter(
+			topic => topic.path !== file.path
+		);
+
+		// Add to front of list
+		this.settings.recentTopics.unshift({
+			path: file.path,
+			title: title,
+			lastAccessed: now
+		});
+
+		// Limit to max recent topics
+		if (this.settings.recentTopics.length > this.settings.maxRecentTopics) {
+			this.settings.recentTopics = this.settings.recentTopics.slice(0, this.settings.maxRecentTopics);
+		}
+
+		await this.saveSettings();
+	}
+
 	async getRecentSources(): Promise<RecentSource[]> {
-		// Filter out sources that no longer exist
+		// Filter out sources that no longer exist and verify they're still sources
 		const validSources = [];
 		for (const source of this.settings.recentSources) {
 			const file = this.app.vault.getAbstractFileByPath(source.path);
 			if (file instanceof TFile) {
-				validSources.push(source);
+				const noteType = await this.identifyNoteType(file);
+				if (noteType === 'source') {
+					validSources.push(source);
+				}
 			}
 		}
 
@@ -352,6 +389,28 @@ export default class STAPlugin extends Plugin {
 		}
 
 		return validSources;
+	}
+
+	async getRecentTopics(): Promise<RecentTopic[]> {
+		// Filter out topics that no longer exist and verify they're still topics
+		const validTopics = [];
+		for (const topic of this.settings.recentTopics) {
+			const file = this.app.vault.getAbstractFileByPath(topic.path);
+			if (file instanceof TFile) {
+				const noteType = await this.identifyNoteType(file);
+				if (noteType === 'topic') {
+					validTopics.push(topic);
+				}
+			}
+		}
+
+		// Update settings if we removed any invalid topics
+		if (validTopics.length !== this.settings.recentTopics.length) {
+			this.settings.recentTopics = validTopics;
+			await this.saveSettings();
+		}
+
+		return validTopics;
 	}
 
 	generateSourcesList(sourcePaths: string[]): string {
@@ -371,6 +430,25 @@ export default class STAPlugin extends Plugin {
 		}
 
 		return sourceLinks.join('\n');
+	}
+
+	generateTopicsList(topicPaths: string[]): string {
+		if (!topicPaths || topicPaths.length === 0) {
+			return '';
+		}
+
+		const topicLinks = [];
+		for (let i = 0; i < topicPaths.length; i++) {
+			const path = topicPaths[i];
+			const file = this.app.vault.getAbstractFileByPath(path);
+			if (file instanceof TFile) {
+				const title = file.basename;
+				const link = `[[${path}|${title}]]`;
+				topicLinks.push(`- ${link}`);
+			}
+		}
+
+		return topicLinks.join('\n');
 	}
 
 	async createSTANote(type: STANoteType) {
@@ -435,15 +513,34 @@ export default class STAPlugin extends Plugin {
 		}
 
 		// Apply topic/argument-specific metadata if provided
-		if ((type === 'topic' || type === 'argument') && metadata && metadata.selectedSources) {
-			const sourcesList = this.generateSourcesList(metadata.selectedSources);
+		if ((type === 'topic' || type === 'argument') && metadata) {
+			// Handle selected sources
+			if (metadata.selectedSources && metadata.selectedSources.length > 0) {
+				const sourcesList = this.generateSourcesList(metadata.selectedSources);
 
-			if (type === 'topic') {
-				// Replace the "Sources" section in topic template
-				content = content.replace(/(> \[!example\] Sources)\s*$/m, `$1\n>\n${sourcesList.split('\n').map(line => `> ${line}`).join('\n')}`);
-			} else if (type === 'argument') {
-				// Replace the "Sources" section in argument template
-				content = content.replace(/(> \[!info\] Sources)\s*$/m, `$1\n>\n${sourcesList.split('\n').map(line => `> ${line}`).join('\n')}`);
+				if (type === 'topic') {
+					// Replace the "Sources" section in topic template
+					content = content.replace(/(> \[!example\] Sources)\s*$/m, `$1\n>\n${sourcesList.split('\n').map(line => `> ${line}`).join('\n')}\n>`);
+				} else if (type === 'argument') {
+					// Replace the "Sources" section in argument template
+					content = content.replace(/(> \[!info\] Sources)\s*$/m, `$1\n>\n${sourcesList.split('\n').map(line => `> ${line}`).join('\n')}\n>`);
+				}
+			}
+
+			// Handle selected topics
+			if (metadata.selectedTopics && metadata.selectedTopics.length > 0) {
+				const topicsList = this.generateTopicsList(metadata.selectedTopics);
+
+				if (type === 'topic') {
+					// Replace the "Relevant Topics" section in topic template
+					content = content.replace(/(> \[!info\] Relevant Topics)\s*>\s*>\s*-\s*$/m, `$1\n>\n${topicsList.split('\n').map(line => `> ${line}`).join('\n')}`);
+				} else if (type === 'argument') {
+					// For arguments, we could add a new section or integrate with existing ones
+					// For now, let's add it after the Sources section
+					if (content.includes('> [!info] Sources')) {
+						content = content.replace(/(> \[!info\] Sources[\s\S]*?)(\n\n## Reasoning and Dispute)/m, `$1\n\n> [!info] Related Topics\n>\n${topicsList.split('\n').map(line => `> ${line}`).join('\n')}$2`);
+					}
+				}
 			}
 		}
 
@@ -1119,8 +1216,12 @@ class STANoteCreationModal extends Modal {
 	starElements: HTMLElement[] = [];
 
 	// Recent sources selection (for topic and argument notes)
-	selectedSources: string[] = [];
+	selectedSources?: string[];
+	selectedTopics?: string[];
+	topicsListBox?: HTMLSelectElement;
 	sourcesListBox?: HTMLSelectElement;
+	selectedSourcesDisplay?: HTMLElement;
+	selectedTopicsDisplay?: HTMLElement;
 
 	constructor(app: App, plugin: STAPlugin, type: STANoteType, defaultFolder?: string) {
 		super(app);
@@ -1227,6 +1328,7 @@ class STANoteCreationModal extends Modal {
 		// Add recent sources selector for topic and argument notes
 		if (this.type === 'topic' || this.type === 'argument') {
 			await this.addRecentSourcesSelector(form);
+			await this.addRecentTopicsSelector(form);
 		}
 
 		// Folder input
@@ -1284,10 +1386,96 @@ class STANoteCreationModal extends Modal {
 		instructions.classList.add('sta-sources-instructions');
 		instructions.textContent = 'Hold Ctrl/Cmd to select multiple sources';
 
+		// Create display area for selected sources
+		this.selectedSourcesDisplay = sourcesContainer.createEl('div');
+		this.selectedSourcesDisplay.classList.add('sta-selected-items');
+		this.selectedSourcesDisplay.style.marginTop = '8px';
+		this.selectedSourcesDisplay.style.fontSize = '0.9em';
+		this.selectedSourcesDisplay.style.color = 'var(--text-muted)';
+
 		// Track selections
 		this.sourcesListBox.addEventListener('change', () => {
 			this.selectedSources = Array.from(this.sourcesListBox!.selectedOptions).map(option => option.value);
+			this.updateSelectedSourcesDisplay();
 		});
+
+		// Initialize display
+		this.updateSelectedSourcesDisplay();
+	}
+
+	updateSelectedSourcesDisplay() {
+		if (!this.selectedSourcesDisplay) return;
+
+		if (this.selectedSources && this.selectedSources.length > 0) {
+			const sourceNames = this.selectedSources.map(path => {
+				const file = this.app.vault.getAbstractFileByPath(path);
+				return file instanceof TFile ? file.basename : path;
+			});
+			this.selectedSourcesDisplay.textContent = `Selected: ${sourceNames.join(', ')}`;
+		} else {
+			this.selectedSourcesDisplay.textContent = 'No sources selected';
+		}
+	}
+
+	updateSelectedTopicsDisplay() {
+		if (!this.selectedTopicsDisplay) return;
+
+		if (this.selectedTopics && this.selectedTopics.length > 0) {
+			const topicNames = this.selectedTopics.map(path => {
+				const file = this.app.vault.getAbstractFileByPath(path);
+				return file instanceof TFile ? file.basename : path;
+			});
+			this.selectedTopicsDisplay.textContent = `Selected: ${topicNames.join(', ')}`;
+		} else {
+			this.selectedTopicsDisplay.textContent = 'No topics selected';
+		}
+	}
+
+	async addRecentTopicsSelector(form: HTMLElement) {
+		const recentTopics = await this.plugin.getRecentTopics();
+
+		if (recentTopics.length === 0) {
+			return; // No recent topics to show
+		}
+
+		form.createEl('label', { text: 'Related Topics (optional):' });
+
+		// Create container for topics selection
+		const topicsContainer = form.createDiv('sta-sources-container');
+
+		// Create multi-select listbox
+		this.topicsListBox = topicsContainer.createEl('select');
+		this.topicsListBox.multiple = true;
+		this.topicsListBox.size = Math.max(3, Math.min(6, recentTopics.length)); // Show 3-6 items
+		this.topicsListBox.classList.add('sta-sources-listbox');
+
+		// Populate with recent topics
+		for (const topic of recentTopics) {
+			const option = this.topicsListBox.createEl('option');
+			option.value = topic.path;
+			option.textContent = topic.title;
+		}
+
+		// Add instructions
+		const instructions = topicsContainer.createEl('div');
+		instructions.classList.add('sta-sources-instructions');
+		instructions.textContent = 'Hold Ctrl/Cmd to select multiple topics';
+
+		// Create display area for selected topics
+		this.selectedTopicsDisplay = topicsContainer.createEl('div');
+		this.selectedTopicsDisplay.classList.add('sta-selected-items');
+		this.selectedTopicsDisplay.style.marginTop = '8px';
+		this.selectedTopicsDisplay.style.fontSize = '0.9em';
+		this.selectedTopicsDisplay.style.color = 'var(--text-muted)';
+
+		// Track selections
+		this.topicsListBox.addEventListener('change', () => {
+			this.selectedTopics = Array.from(this.topicsListBox!.selectedOptions).map(option => option.value);
+			this.updateSelectedTopicsDisplay();
+		});
+
+		// Initialize display
+		this.updateSelectedTopicsDisplay();
 	}
 
 	getDefaultFolder(): string {
@@ -1351,9 +1539,9 @@ class STANoteCreationModal extends Modal {
 				bibtex: bibtex
 			};
 		} else if (this.type === 'topic' || this.type === 'argument') {
-			// Add selected sources to metadata
 			metadata = {
-				selectedSources: this.selectedSources
+				selectedSources: this.selectedSources || [],
+				selectedTopics: this.selectedTopics || []
 			};
 		}
 

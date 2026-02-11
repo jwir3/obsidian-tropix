@@ -20,6 +20,9 @@ export interface STAPluginSettings {
 	// Recent sources tracking
 	recentSources: RecentSource[];
 	maxRecentSources: number;
+	// Recent topics tracking
+	recentTopics: RecentTopic[];
+	maxRecentTopics: number;
 }
 
 export type STANoteType = 'source' | 'topic' | 'argument';
@@ -54,6 +57,12 @@ export interface SourceMetadata {
 }
 
 export interface RecentSource {
+	path: string;
+	title: string;
+	lastAccessed: number;
+}
+
+export interface RecentTopic {
 	path: string;
 	title: string;
 	lastAccessed: number;

@@ -795,6 +795,30 @@
     background-color: var(--background-primary-alt);
 }
 
+/* Selected items display */
+.sta-selected-items {
+    padding: 6px 10px;
+    background-color: var(--background-secondary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 4px;
+    font-size: 0.85em;
+    color: var(--text-muted);
+    min-height: 20px;
+    line-height: 1.4;
+}
+
+.theme-dark .sta-selected-items {
+    background-color: var(--background-primary-alt);
+    border-color: var(--background-modifier-border-hover);
+    color: var(--text-muted);
+}
+
+.sta-selected-items:empty::before {
+    content: "No items selected";
+    color: var(--text-faint);
+    font-style: italic;
+}
+
 /* Tropical Callout Styles */
 
 /* Source callouts - Wave/Ocean theme */
